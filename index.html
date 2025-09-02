@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Rafale – Révélation au scroll</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html,body { height:100%; margin:0; background:#0a0a0a; color:#fff; }
+    body { overflow-y: auto; }
+    #stage { position:fixed; inset:0; }
+    #overlayHint {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      padding: 8px 12px; font: 12px/1.2 system-ui, sans-serif;
+      background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 8px;
+      pointer-events: none; opacity:.8
+    }
+    /* page longue pour activer le scroll (luminosité mappée au scroll) */
+    .scroll-space { height: 300vh; }
+    
+    /* Styles pour le contenu web classique */
+    .web-content {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      color: black;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    
+    .web-content.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .content-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 60px 40px;
+      font-family: 'Arial', sans-serif;
+    }
+    
+    .web-content h1 {
+      font-size: 3.5rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #1a1a1a;
+      text-align: center;
+    }
+    
+    .web-content h2 {
+      font-size: 1.8rem;
+      font-weight: 300;
+      margin-bottom: 50px;
+      color: #666;
+      text-align: center;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-bottom: 50px;
+    }
+    
+    .info-card {
+      background: #f8f9fa;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .info-card h3 {
+      font-size: 1.4rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+    
+    .info-card ul {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .info-card li {
+      padding: 8px 0;
+      border-bottom: 1px solid #e9ecef;
+      color: #495057;
+    }
+    
+    .info-card li:last-child {
+      border-bottom: none;
+    }
+    
+    .description {
+      background: #f8f9fa;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .description p {
+      font-size: 1.1rem;
+      line-height: 1.8;
+      color: #495057;
+      margin-bottom: 20px;
+    }
+    
+    .description p:last-child {
+      margin-bottom: 0;
+    }
+    
+    /* Styles pour le lecteur audio */
+    .audio-player {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      backdrop-filter: blur(10px);
+      z-index: 1001;
+      transition: all 0.3s ease;
+    }
+    
+    .audio-player:hover {
+      background: rgba(0, 0, 0, 0.9);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .play-pause-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: white;
+      font-size: 16px;
+      position: relative;
+    }
+    
+    .play-pause-btn .play-icon,
+    .play-pause-btn .pause-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      line-height: 1;
+    }
+    
+    .play-pause-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: scale(1.05);
+    }
+    
+    .play-pause-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .play-icon, .pause-icon {
+      transition: opacity 0.3s ease;
+    }
+    
+    .play-pause-btn.playing .play-icon {
+      opacity: 0;
+    }
+    
+    .play-pause-btn.playing .pause-icon {
+      opacity: 1;
+    }
+    
+    .play-pause-btn:not(.playing) .play-icon {
+      opacity: 1;
+    }
+    
+    .play-pause-btn:not(.playing) .pause-icon {
+      opacity: 0;
+    }
+    
+    .audio-info {
+      color: white;
+      font-family: 'Arial', sans-serif;
+    }
+    
+    .track-name {
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0.9;
+    }
+    
+    .unlock-hint {
+      font-size: 11px;
+      opacity: 0.6;
+      display: block;
+      margin-top: 2px;
+    }
+    
+    .audio-player.unlocked .unlock-hint {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Canvas en plein écran -->
+  <div id="stage"></div>
+  <div id="overlayHint">Scroll DOWN = zoom • Scroll UP = retour position initiale • Souris = rotation (±60°)</div>
+  
+  <!-- Lecteur audio -->
+  <div id="audio-player" class="audio-player">
+    <audio id="background-music" loop>
+      <source src="ost.mp3" type="audio/mpeg">
+      Votre navigateur ne supporte pas l'élément audio.
+    </audio>
+    <button id="play-pause-btn" class="play-pause-btn">
+      <span class="play-icon">▶</span>
+      <span class="pause-icon">⏸</span>
+    </button>
+    <div class="audio-info">
+      <span class="track-name">OST</span>
+      <span class="unlock-hint">Cliquez pour débloquer</span>
+    </div>
+  </div>
+  
+
+  <div class="scroll-space"></div>
+  
+  <!-- Contenu web classique (apparaît en phase 3) -->
+  <div id="web-content" class="web-content">
+    <div class="content-container">
+      <h1>Dassault Rafale</h1>
+      <h2>L'avion de combat nouvelle génération</h2>
+      
+      <div class="info-grid">
+        <div class="info-card">
+          <h3>Caractéristiques</h3>
+          <ul>
+            <li>Longueur : 15,27 m</li>
+            <li>Envergure : 10,80 m</li>
+            <li>Hauteur : 5,34 m</li>
+            <li>Vitesse max : Mach 1,8</li>
+            <li>Plafond : 15 240 m</li>
+          </ul>
+        </div>
+        
+        <div class="info-card">
+          <h3>Armement</h3>
+          <ul>
+            <li>Canon de 30 mm</li>
+            <li>Missiles air-air</li>
+            <li>Missiles air-sol</li>
+            <li>Bombes guidées</li>
+            <li>Pod de reconnaissance</li>
+          </ul>
+        </div>
+        
+        <div class="info-card">
+          <h3>Pays utilisateurs</h3>
+          <ul>
+            <li>France</li>
+            <li>Égypte</li>
+            <li>Qatar</li>
+            <li>Inde</li>
+            <li>Grèce</li>
+            <li>Croatie</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="description">
+        <p>Le Dassault Rafale est un avion de combat multirôle développé par Dassault Aviation. 
+        Conçu pour remplacer plusieurs types d'avions militaires, il combine polyvalence, 
+        agilité et technologie de pointe.</p>
+        
+        <p>Entré en service dans l'Armée de l'air française en 2001, le Rafale a depuis 
+        démontré ses capacités exceptionnelles dans de nombreux théâtres d'opérations 
+        et continue d'être exporté avec succès à travers le monde.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Même version que ton code qui fonctionne -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/DRACOLoader.js"></script>
+
+  <script>
+    // --- scène / caméra / rendu ---
+    const container = document.getElementById('stage');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 5000);
+
+    // Légère contre-plongée + vue de face
+    camera.position.set(0, 1.2, 7);
+    camera.lookAt(0, 0.5, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.outputEncoding = THREE.sRGBEncoding;               // r140
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    container.appendChild(renderer.domElement);
+
+    // --- système d'éclairage dramatique ---
+    
+    // Lumière principale (key light) - devant l'avion
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.0);
+    keyLight.position.set(2, 3, 4);
+    keyLight.target.position.set(0, 0, 0);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+    scene.add(keyLight.target);
+
+    // Lumière de remplissage (fill light) - côté opposé
+    const fillLight = new THREE.DirectionalLight(0x4a90e2, 0.0);
+    fillLight.position.set(-2, 1, 3);
+    fillLight.target.position.set(0, 0, 0);
+    scene.add(fillLight);
+    scene.add(fillLight.target);
+
+    // Lumière de contour (rim light) - derrière pour la séparation
+    const rimLight = new THREE.DirectionalLight(0x00aaff, 0.0);
+    rimLight.position.set(0, 2, -4);
+    rimLight.target.position.set(0, 0, 0);
+    scene.add(rimLight);
+    scene.add(rimLight.target);
+
+    // Lumière d'ambiance très subtile
+    const ambientLight = new THREE.AmbientLight(0x0a0a0a, 0.0);
+    scene.add(ambientLight);
+
+    // --- contrôles : uniquement azimut, ±60°, pas de vertical ---
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.enableZoom = false;               // on garde la distance fixe pour la compo
+    controls.enableRotate = true;              // rotation activée
+
+    // On fixe l'angle vertical (polar) actuel -> pas de haut/bas
+    const currentPolar = controls.getPolarAngle();
+    controls.minPolarAngle = currentPolar;
+    controls.maxPolarAngle = currentPolar;
+
+    // Limite gauche/droite à ±60°
+    const limit = THREE.Math.degToRad(60);
+    controls.minAzimuthAngle = -limit;
+    controls.maxAzimuthAngle = +limit;
+
+    // En plus : rotation "hover" (sans drag) = on ease vers une cible selon la position X de la souris
+    let hoverTargetAzimuth = 0;
+    window.addEventListener('mousemove', (e)=>{
+      const nx = (e.clientX / innerWidth) * 2 - 1;  // -1..+1
+      hoverTargetAzimuth = THREE.MathUtils.clamp(nx * limit, -limit, limit);
+    });
+
+    // --- sol supprimé pour un espace infini ---
+
+    // --- effet de fumée ---
+    const smokeCount = 200;
+    const smokeGeometry = new THREE.BufferGeometry();
+    const smokePositions = new Float32Array(smokeCount * 3);
+    const smokeVelocities = new Float32Array(smokeCount * 3);
+    const smokeSizes = new Float32Array(smokeCount);
+    const smokeOpacities = new Float32Array(smokeCount);
+    
+    // Initialiser les particules de fumée
+    for (let i = 0; i < smokeCount; i++) {
+      const i3 = i * 3;
+      
+      // Position aléatoire autour de l'avion
+      smokePositions[i3] = (Math.random() - 0.5) * 8;
+      smokePositions[i3 + 1] = Math.random() * 2 - 1;
+      smokePositions[i3 + 2] = (Math.random() - 0.5) * 8;
+      
+      // Vitesse très douce vers le haut
+      smokeVelocities[i3] = (Math.random() - 0.5) * 0.003;
+      smokeVelocities[i3 + 1] = Math.random() * 0.008 + 0.005;
+      smokeVelocities[i3 + 2] = (Math.random() - 0.5) * 0.003;
+      
+      // Taille aléatoire plus petite
+      smokeSizes[i] = Math.random() * 0.1 + 0.05;
+      
+      // Opacité aléatoire plus subtile
+      smokeOpacities[i] = Math.random() * 0.15 + 0.05;
+    }
+    
+    smokeGeometry.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+    smokeGeometry.setAttribute('size', new THREE.BufferAttribute(smokeSizes, 1));
+    smokeGeometry.setAttribute('opacity', new THREE.BufferAttribute(smokeOpacities, 1));
+    
+    // Matériau de fumée plus subtil
+    const smokeMaterial = new THREE.PointsMaterial({
+      color: 0xaaaaaa,
+      size: 0.02,  // Beaucoup plus petit
+      transparent: true,
+      opacity: 0.7,  // Plus transparent
+      blending: THREE.AdditiveBlending,  // Blending additif pour la fumée
+      sizeAttenuation: true
+    });
+    
+    const smokeMesh = new THREE.Points(smokeGeometry, smokeMaterial);
+    scene.add(smokeMesh);
+
+    // --- texte flottant ---
+    // === CONTRÔLEURS SIMPLES POUR LE TEXTE ===
+    const TEXT_POSITION = { x: 0, y: -0.1, z: -9 };  // Position du texte (derrière la grille)
+    const TEXT_SCALE = 5.0;                        // Taille du texte
+    const TEXT_OPACITY = 0.8;                      // Opacité du texte
+    const TEXT_SIZE = 48;                          // Taille de la police
+    const TEXT_COLOR = 'rgba(255, 255, 255, 0.9)'; // Couleur du texte
+    const TEXT_CONTENT = 'RAFALE';                 // Contenu du texte
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 1024;  // Résolution doublée
+    canvas.height = 256;  // Résolution doublée
+    
+    // Style du texte avec anti-aliasing
+    context.fillStyle = TEXT_COLOR;
+    context.font = `bold ${TEXT_SIZE * 2}px Arial, sans-serif`;  // Police doublée pour la haute résolution
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.textRenderingOptimization = 'optimizeQuality';  // Qualité optimale
+    context.fillText(TEXT_CONTENT, canvas.width / 2, canvas.height / 2);
+    
+    // Créer la texture et le matériau avec filtrage haute qualité
+    const textTexture = new THREE.CanvasTexture(canvas);
+    textTexture.minFilter = THREE.LinearFilter;  // Filtrage linéaire
+    textTexture.magFilter = THREE.LinearFilter;  // Filtrage linéaire
+    textTexture.generateMipmaps = false;         // Pas de mipmaps pour le texte
+    const textMaterial = new THREE.MeshBasicMaterial({ 
+      map: textTexture, 
+      transparent: true, 
+      opacity: 0.0  // Commence invisible
+    });
+    
+    // Créer le plan pour le texte
+    const textGeometry = new THREE.PlaneGeometry(4, 1);
+    const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+    textMesh.position.set(TEXT_POSITION.x, TEXT_POSITION.y, TEXT_POSITION.z);
+    textMesh.scale.setScalar(TEXT_SCALE);
+    scene.add(textMesh);
+
+    // --- chargement du Rafale ---
+    const MODEL_PATH = './Rafal.glb'; // attention à l'orthographe/casse exacts
+    const loader = new THREE.GLTFLoader();
+    const draco = new THREE.DRACOLoader();
+    draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/libs/draco/');
+    loader.setDRACOLoader(draco);
+
+    let model, center = new THREE.Vector3();
+    loader.load(
+      MODEL_PATH,
+      (gltf)=>{
+        model = gltf.scene;
+        // Au cas où : normalisation d'échelle douce pour tenir dans le cadre
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const target = 6; // ~ largeur visuelle cible
+        const s = target / maxDim;
+        model.scale.setScalar(s);
+
+        // recentrer et petite rotation pour être pile de face
+        box.setFromObject(model);
+        box.getCenter(center);
+        model.position.sub(center);             // centre à (0,0,0)
+        model.position.y += 0.5;
+        model.position.z += 0;
+        model.position.x += 1;                // légère contre-plongée (remonte un peu)
+
+        // orienter de face (ajuste si besoin selon ton fichier)
+        model.rotation.y = Math.PI/-2;             // 90 degrés vers la droite
+
+        scene.add(model);
+        console.log('✅ Rafal chargé');
+      },
+      (xhr)=>{ console.log(`Rafal ${(xhr.loaded/(xhr.total||1)*100).toFixed(0)}%`); },
+      (err)=>{ console.error(err); showError('Erreur chargement GLB'); }
+    );
+
+    // Variables pour le système de scroll
+    let initialCameraPosition = { x: 0, y: 1.2, z: 8 };
+    let initialCameraTarget = { x: 0, y: 0.5, z: 0 };
+    let initialModelRotation = Math.PI/-2;
+    
+    // Variables pour mémoriser la position de la caméra
+    let lastCameraPosition = { x: 0, y: 1.2, z: 8 };
+    let lastCameraTarget = { x: 0, y: 0.5, z: 0 };
+    
+    // Variables pour mémoriser la rotation de l'avion
+    let lastModelRotation = Math.PI/-2;
+    
+    // Variables pour la grille holographique
+    let hologramGrid = null;
+    let gridMaterial = null;
+    
+    // Fonction pour créer la grille holographique
+    function createHologramGrid() {
+      const gridSize = 15;
+      const divisions = 30;
+      const gridGeometry = new THREE.PlaneGeometry(gridSize, gridSize, divisions, divisions);
+      
+      // Créer un shader personnalisé pour le dégradé
+      const vertexShader = `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `;
+      
+      const fragmentShader = `
+        uniform vec3 color;
+        uniform float opacity;
+        varying vec2 vUv;
+        
+        void main() {
+          // Calculer la distance du centre
+          vec2 center = vec2(0.5, 0.5);
+          float dist = distance(vUv, center);
+          
+          // Créer un dégradé radial (plus sombre sur les bords)
+          float gradient = 1.0 - smoothstep(0.3, 0.7, dist);
+          
+          // Appliquer le dégradé à l'opacité
+          float finalOpacity = opacity * gradient;
+          
+          gl_FragColor = vec4(color, finalOpacity);
+        }
+      `;
+      
+      // Matériau shader avec dégradé
+      gridMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          color: { value: new THREE.Color(0x00ffff) },
+          opacity: { value: 0.4 }
+        },
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        transparent: true,
+        wireframe: true,
+        side: THREE.DoubleSide
+      });
+      
+      hologramGrid = new THREE.Mesh(gridGeometry, gridMaterial);
+      hologramGrid.rotation.x = -Math.PI / 2; // Horizontal
+      hologramGrid.position.y = -0.6; // Plus proche de l'avion
+      hologramGrid.visible = false;
+      
+      scene.add(hologramGrid);
+    }
+    
+    // --- mapping du scroll avec phases de transition ---
+    function updateLightsFromScroll(){
+      const max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+      const t = THREE.MathUtils.clamp(window.scrollY / max, 0, 1);
+      
+      // Phase 1: Particules seules (0-20%)
+      if (t <= 0.2) {
+        // Désactiver complètement les contrôles - pas de rotation possible
+        controls.enabled = false;
+        
+        // Lumières éteintes
+        keyLight.intensity = 0;
+        fillLight.intensity = 0;
+        rimLight.intensity = 0;
+        ambientLight.intensity = 0;
+        
+        // Texte invisible
+        textMaterial.opacity = 0;
+        
+        // Avion invisible mais fumée visible
+        if (model) model.visible = false;
+        if (smokeMesh) smokeMesh.visible = true;
+        
+        // Grille holographique invisible
+        if (hologramGrid) hologramGrid.visible = false;
+        
+        // Position fixe caméra
+        camera.position.set(initialCameraPosition.x, initialCameraPosition.y, initialCameraPosition.z);
+        camera.lookAt(initialCameraTarget.x, initialCameraTarget.y, initialCameraTarget.z);
+        
+        // Masquer le contenu web
+        const webContent = document.getElementById('web-content');
+        if (webContent) webContent.classList.remove('visible');
+      }
+      
+             // Phase 2: Dévoilement + rotation libre (20-65%)
+       else if (t <= 0.65) {
+         const phaseProgress = (t - 0.2) / 0.45;
+         
+         // Activer les contrôles pour permettre la rotation
+         controls.enabled = true;
+         
+         // Lumières progressives
+         keyLight.intensity = 1.8 * phaseProgress;
+         fillLight.intensity = 0.8 * phaseProgress;
+         rimLight.intensity = 1.2 * phaseProgress;
+         ambientLight.intensity = 0.1 * phaseProgress;
+         
+         // Texte progressif
+         textMaterial.opacity = TEXT_OPACITY * phaseProgress;
+         
+                 // Avion et fumée visibles
+        if (model) model.visible = true;
+        if (smokeMesh) smokeMesh.visible = true;
+        
+        // Grille holographique qui apparaît progressivement et doucement
+        if (hologramGrid) {
+          hologramGrid.visible = true;
+          // Apparition plus douce avec un délai
+          const gridProgress = Math.max(0, (phaseProgress - 0.3) / 0.7);
+          gridMaterial.uniforms.opacity.value = 0.4 * gridProgress;
+        }
+         
+         // Zoom progressif
+         const startDistance = 8;
+         const endDistance = 5;
+         const currentDistance = startDistance - (startDistance - endDistance) * phaseProgress;
+         camera.position.z = currentDistance;
+         
+         // Mémoriser la position actuelle de la caméra
+         lastCameraPosition.x = camera.position.x;
+         lastCameraPosition.y = camera.position.y;
+         lastCameraPosition.z = camera.position.z;
+         lastCameraTarget.x = camera.target.x;
+         lastCameraTarget.y = camera.target.y;
+         lastCameraTarget.z = camera.target.z;
+         
+         // Mémoriser la rotation actuelle de l'avion
+         if (model) {
+           lastModelRotation = model.rotation.y;
+         }
+         
+         // Masquer le contenu web
+         const webContent = document.getElementById('web-content');
+         if (webContent) webContent.classList.remove('visible');
+       }
+      
+             // Phase 3: Disparition + transition vers page web (65-85%)
+       else if (t <= 0.85) {
+         const phaseProgress = (t - 0.65) / 0.2;
+         const fadeOut = 1 - phaseProgress;
+         
+         // Désactiver les contrôles mais garder la position de caméra actuelle
+         controls.enabled = false;
+         
+         // Garder la position de caméra de la phase 2 (pas de reset)
+         camera.position.set(lastCameraPosition.x, lastCameraPosition.y, lastCameraPosition.z);
+         camera.lookAt(lastCameraTarget.x, lastCameraTarget.y, lastCameraTarget.z);
+         
+         // Garder la rotation de l'avion de la phase 2 (pas de reset)
+         if (model) {
+           model.rotation.y = lastModelRotation;
+         }
+         
+         // Lumières qui baissent
+         keyLight.intensity = 1.8 * fadeOut;
+         fillLight.intensity = 0.8 * fadeOut;
+         rimLight.intensity = 1.2 * fadeOut;
+         ambientLight.intensity = 0.1 * fadeOut;
+         
+         // Texte qui disparaît
+         textMaterial.opacity = TEXT_OPACITY * fadeOut;
+         
+                 // Avion et fumée qui disparaissent
+        if (model) model.visible = fadeOut > 0.1;
+        if (smokeMesh) smokeMesh.visible = fadeOut > 0.1;
+        
+        // Grille holographique qui reste visible et pulse doucement
+        if (hologramGrid) {
+          hologramGrid.visible = true;
+          // Garder l'opacité de base pour la pulsation
+          gridMaterial.uniforms.opacity.value = 0.4;
+        }
+         
+         // Masquer le contenu web
+         const webContent = document.getElementById('web-content');
+         if (webContent) webContent.classList.remove('visible');
+       }
+      
+             // Phase 4: Page web classique (85-100%)
+       else {
+         // Désactiver les contrôles
+         controls.enabled = false;
+         
+         // Garder la rotation de l'avion de la phase 2 (pas de reset vers position initiale)
+         if (model) {
+           model.rotation.y = lastModelRotation;
+         }
+         
+         // Garder la position de caméra de la phase 2 (pas de reset vers position initiale)
+         camera.position.set(lastCameraPosition.x, lastCameraPosition.y, lastCameraPosition.z);
+         camera.lookAt(lastCameraTarget.x, lastCameraTarget.y, lastCameraTarget.z);
+         
+         // Toutes les lumières éteintes
+         keyLight.intensity = 0;
+         fillLight.intensity = 0;
+         rimLight.intensity = 0;
+         ambientLight.intensity = 0;
+         
+         // Texte invisible
+         textMaterial.opacity = 0;
+         
+                 // Avion et fumée invisibles
+        if (model) model.visible = false;
+        if (smokeMesh) smokeMesh.visible = false;
+        
+        // Grille holographique reste visible et pulse doucement
+        if (hologramGrid) {
+          hologramGrid.visible = true;
+          gridMaterial.uniforms.opacity.value = 0.4;
+        }
+         
+         // Activer le mode page web
+         document.body.style.backgroundColor = 'white';
+         document.body.style.color = 'black';
+         
+         // Afficher le contenu web
+         const webContent = document.getElementById('web-content');
+         if (webContent) webContent.classList.add('visible');
+       }
+      
+      // Retour au début : reset complet
+      if (t === 0) {
+        // Remettre tout en position initiale
+        if (model) {
+          model.rotation.y = initialModelRotation;
+          model.visible = false;
+        }
+        camera.position.set(initialCameraPosition.x, initialCameraPosition.y, initialCameraPosition.z);
+        camera.lookAt(initialCameraTarget.x, initialCameraTarget.y, initialCameraTarget.z);
+        
+        // Contrôles désactivés au début
+        controls.enabled = false;
+        
+        // Remettre le fond noir
+        document.body.style.backgroundColor = '#0a0a0a';
+        document.body.style.color = 'white';
+        
+        // Masquer le contenu web
+        const webContent = document.getElementById('web-content');
+        if (webContent) webContent.classList.remove('visible');
+        
+        // Reset des contrôles à la position de base
+        controls.reset();
+      }
+    }
+    updateLightsFromScroll();
+    window.addEventListener('scroll', updateLightsFromScroll, { passive:true });
+
+    // --- Lecteur audio ---
+    const audio = document.getElementById('background-music');
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    const audioPlayer = document.getElementById('audio-player');
+    let isPlaying = false;
+    
+    // Fonction pour basculer play/pause
+    function togglePlayPause() {
+      if (isPlaying) {
+        audio.pause();
+        playPauseBtn.classList.remove('playing');
+        isPlaying = false;
+      } else {
+        audio.play().catch(e => {
+          console.log('Lecture automatique bloquée par le navigateur');
+        });
+        playPauseBtn.classList.add('playing');
+        isPlaying = true;
+      }
+    }
+    
+    // Event listeners
+    playPauseBtn.addEventListener('click', togglePlayPause);
+    
+    // Gérer les événements audio
+    audio.addEventListener('play', () => {
+      playPauseBtn.classList.add('playing');
+      isPlaying = true;
+    });
+    
+    audio.addEventListener('pause', () => {
+      playPauseBtn.classList.remove('playing');
+      isPlaying = false;
+    });
+    
+    // Gérer les erreurs de chargement
+    audio.addEventListener('error', (e) => {
+      console.error('Erreur de chargement audio:', e);
+      playPauseBtn.style.opacity = '0.5';
+      playPauseBtn.style.cursor = 'not-allowed';
+    });
+    
+    // Volume par défaut
+    audio.volume = 0.3;
+    
+    // Déblocage de l'audio avec interaction utilisateur
+    let audioUnlocked = false;
+    
+    function unlockAudio() {
+      if (!audioUnlocked) {
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audioUnlocked = true;
+          audioPlayer.classList.add('unlocked');
+          console.log('Audio débloqué - prêt à jouer');
+        }).catch(e => {
+          console.log('Erreur de déblocage audio:', e);
+        });
+      }
+    }
+    
+    // Débloquer l'audio au premier clic/interaction
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    
+    // Lecture automatique après déblocage
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (audioUnlocked) {
+          audio.play().catch(e => {
+            console.log('Lecture automatique échouée:', e);
+          });
+          playPauseBtn.classList.add('playing');
+          isPlaying = true;
+        }
+      }, 1500);
+    });
+
+    // --- boucle ---
+    function animate(){
+      requestAnimationFrame(animate);
+
+      // easing doux vers l'azimut cible (hover), seulement si contrôles activés
+      if (controls.enabled) {
+      const currentAz = controls.getAzimuthalAngle();
+      const nextAz = THREE.MathUtils.damp(currentAz, hoverTargetAzimuth, 6, 1/60);
+        const diff = currentAz - nextAz;
+        if (Math.abs(diff) > 0.001) {
+          // Utiliser la bonne méthode pour cette version d'OrbitControls
+          controls.azimuthAngle = nextAz;
+        }
+      // clamp manuel au cas où
+        const finalAz = controls.getAzimuthalAngle();
+        if (finalAz < controls.minAzimuthAngle) {
+          controls.azimuthAngle = controls.minAzimuthAngle;
+        }
+        if (finalAz > controls.maxAzimuthAngle) {
+          controls.azimuthAngle = controls.maxAzimuthAngle;
+        }
+      }
+
+      // Animation de la fumée
+      const positions = smokeGeometry.attributes.position.array;
+      const opacities = smokeGeometry.attributes.opacity.array;
+      
+      for (let i = 0; i < smokeCount; i++) {
+        const i3 = i * 3;
+        
+        // Mettre à jour les positions avec mouvement doux
+        positions[i3] += smokeVelocities[i3];
+        positions[i3 + 1] += smokeVelocities[i3 + 1];
+        positions[i3 + 2] += smokeVelocities[i3 + 2];
+        
+        // Ajouter un léger mouvement de flottement
+        positions[i3] += Math.sin(Date.now() * 0.001 + i) * 0.0005;
+        positions[i3 + 2] += Math.cos(Date.now() * 0.001 + i) * 0.0005;
+        
+        // Faire disparaître la fumée en haut
+        if (positions[i3 + 1] > 3) {
+          positions[i3] = (Math.random() - 0.5) * 8;
+          positions[i3 + 1] = -1;
+          positions[i3 + 2] = (Math.random() - 0.5) * 8;
+          opacities[i] = Math.random() * 0.15 + 0.05;
+        }
+        
+        // Variation d'opacité très douce
+        opacities[i] += (Math.random() - 0.5) * 0.002;
+        opacities[i] = Math.max(0.02, Math.min(0.2, opacities[i]));
+        
+        // Variation d'opacité basée sur le temps pour un effet plus fluide
+        opacities[i] += Math.sin(Date.now() * 0.002 + i * 0.1) * 0.001;
+      }
+      
+      smokeGeometry.attributes.position.needsUpdate = true;
+      smokeGeometry.attributes.opacity.needsUpdate = true;
+
+      // Animation de la grille holographique
+      if (hologramGrid && hologramGrid.visible && gridMaterial) {
+        // Effet de pulsation douce et continue
+        const time = Date.now() * 0.001;
+        const baseOpacity = 0.4;
+        gridMaterial.uniforms.opacity.value = baseOpacity + Math.sin(time * 1.5) * 0.05;
+        
+        // Légère rotation pour effet holographique
+        hologramGrid.rotation.z = Math.sin(time * 0.3) * 0.01;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    
+    // Créer la grille holographique
+    createHologramGrid();
+    
+    animate();
+
+    // --- resize ---
+    window.addEventListener('resize', ()=>{
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // petite aide visuelle d'erreur
+    function showError(msg){
+      const el = document.getElementById('err');
+      el.textContent = msg;
+      el.style.display = 'inline-block';
+    }
+  </script>
+</body>
+</html>
