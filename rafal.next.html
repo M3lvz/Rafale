@@ -223,7 +223,7 @@
   <!-- Lecteur audio -->
   <div id="audio-player" class="audio-player">
     <audio id="background-music" loop>
-      <source src="Asset/ost.mp3" type="audio/mpeg">
+      <source src="ost.mp3" type="audio/mpeg">
       Votre navigateur ne supporte pas l'élément audio.
     </audio>
     <button id="play-pause-btn" class="play-pause-btn">
@@ -457,7 +457,7 @@
     scene.add(textMesh);
 
     // --- chargement du Rafale ---
-    const MODEL_PATH = './Asset/Rafal.glb'; // attention à l'orthographe/casse exacts
+    const MODEL_PATH = './Rafal.glb'; // attention à l'orthographe/casse exacts
     const loader = new THREE.GLTFLoader();
     const draco = new THREE.DRACOLoader();
     draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/libs/draco/');
@@ -851,14 +851,14 @@
 
       // easing doux vers l'azimut cible (hover), seulement si contrôles activés
       if (controls.enabled) {
-        const currentAz = controls.getAzimuthalAngle();
-        const nextAz = THREE.MathUtils.damp(currentAz, hoverTargetAzimuth, 6, 1/60);
+      const currentAz = controls.getAzimuthalAngle();
+      const nextAz = THREE.MathUtils.damp(currentAz, hoverTargetAzimuth, 6, 1/60);
         const diff = currentAz - nextAz;
         if (Math.abs(diff) > 0.001) {
           // Utiliser la bonne méthode pour cette version d'OrbitControls
           controls.azimuthAngle = nextAz;
         }
-        // clamp manuel au cas où
+      // clamp manuel au cas où
         const finalAz = controls.getAzimuthalAngle();
         if (finalAz < controls.minAzimuthAngle) {
           controls.azimuthAngle = controls.minAzimuthAngle;
